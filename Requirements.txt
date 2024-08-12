@@ -1,0 +1,5 @@
+nasm
+i386-elf-gcc
+i386-elf-ld
+qemu-system-i386 or qemu-system-x86_64
+code editor of your choice
