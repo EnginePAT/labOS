@@ -1,28 +1,33 @@
-ASM=nasm
-CC=i386-elf-gcc
-LD=i386-elf-ld
-
-SRC_DIR=src
-BUILD_DIR=build
-
-$(BUILD_DIR)/labOS-2024.01-x86_64.img: $(BUILD_DIR)/main.bin
-	cp $(BUILD_DIR)/main.bin $(BUILD_DIR)/labOS-2024.01-x86_64.img
-	truncate -s 1440k $(BUILD_DIR)/labOS-2024.01-x86_64.img
-	#bash file-system/setup.sh
-	make run
-	
-$(BUILD_DIR)/main.bin: $(SRC_DIR)/boot.asm
-	mkdir -p $(BUILD_DIR)
-	mkdir -p $(BUILD_DIR)/obj
-	$(ASM) $(SRC_DIR)/boot.asm -f bin -o $(BUILD_DIR)/main.bin
-	$(CC) -ffreestanding -m32 -g -c $(SRC_DIR)/kernel.cpp -o $(BUILD_DIR)/obj/kernel.o
-	$(ASM) $(SRC_DIR)/kernel_entry.asm -f elf -o build/obj/kernel_entry.o
-	$(LD) -o build/full_kernel.bin -Ttext 0x1000 build/obj/kernel_entry.o build/obj/kernel.o --oformat binary
-	cat build/boot.bin build/full_kernel.bin > build/os.bin
+all: clean kernel boot image run
 
 clean:
-	-rm build/*
+	rm -rf build/*.o
+
+kernel:
+	gcc -g -m32 -fno-stack-protector -fno-builtin -c src/vga.c -o build/vga.o
+	gcc -g -m32 -fno-stack-protector -fno-builtin -c src/kernel.c -o build/kernel.o
+#	gcc -g -m32 -fno-stack-protector -fno-builtin -c src/gdt.c -o build/gdt.o
+
+boot:
+	nasm -f elf32 src/boot.asm -o build/boot.o
+	nasm -f elf32 src/gdt.asm -o build/gdts.o
+
+image:
+	ld -m elf_i386 -T src/linker.ld -o build/kernel build/kernel.o build/boot.o build/gdt.o build/gdt.o
+	mv build/kernel Lab/boot/kernel
+	grub-mkrescue -o labOS-2024.01-x86_64.iso Lab/
+
+
+
+
+# link with linker.ld
+# ld -m elf_i386 -T src/linker.ld -o build/kernel build/kernel.o build/boot.o
+# compile kernel.c
+# gcc -m32 -fno-stack-protector -fno-builtin -c src/kernel.c -o build/kernel.o
+# compile boot.asm
+# nasm -f elf32 src/boot.asm -o build/boot.o
+# constuct iso file
+# grub-mkrescue -o labOS-2024.01.iso LAB/
 
 run:
-	make
-	qemu-system-i386 -fda build/labOS-2024.01-x86_64.img
+	qemu-system-i386 labOS-2024.01.iso
